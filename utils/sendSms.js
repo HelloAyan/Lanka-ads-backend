@@ -1,33 +1,37 @@
 const axios = require("axios");
 
 const sendSms = async ({ phone, message }) => {
-    /*
-      SMSAPI.LK documentation থেকে এখানে real endpoint বসাবেন.
-  
-      Example format:
-      POST https://api.smsapi.lk/send
-      headers: Authorization Bearer TOKEN
-      body: { to, message, from }
-  
-      নিচেরটা placeholder.
-    */
+    try {
+        const cleanPhone = String(phone).replace(/\+/g, "").trim();
 
-    const response = await axios.post(
-        "https://api.smsapi.lk/send",
-        {
-            to: phone,
-            message,
-            from: process.env.SMSAPI_FROM,
-        },
-        {
-            headers: {
-                Authorization: `Bearer ${process.env.SMSAPI_TOKEN}`,
-                "Content-Type": "application/json",
+        const response = await axios.post(
+            "https://dashboard.smsapi.lk/api/v3/sms/send",
+            {
+                recipient: cleanPhone,
+                sender_id: process.env.SMSAPI_FROM,
+                type: "plain",
+                message: message,
             },
-        }
-    );
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.SMSAPI_TOKEN}`,
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+            }
+        );
 
-    return response.data;
+        console.log("SMSAPI.LK Response:", response.data);
+
+        if (response.data?.status !== "success") {
+            throw new Error(response.data?.message || "SMS sending failed");
+        }
+
+        return response.data;
+    } catch (error) {
+        console.log("SMSAPI.LK Error:", error.response?.data || error.message);
+        throw error;
+    }
 };
 
 module.exports = sendSms;

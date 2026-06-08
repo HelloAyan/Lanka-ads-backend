@@ -21,8 +21,6 @@ const sendSms = async ({ phone, message }) => {
             }
         );
 
-        console.log("SMSAPI.LK Response:", response.data);
-
         if (response.data?.status !== "success") {
             throw new Error(response.data?.message || "SMS sending failed");
         }

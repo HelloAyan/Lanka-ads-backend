@@ -2,6 +2,13 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
     {
+        accountId: {
+            type: String,
+            required: true,
+            unique: true,
+            index: true,
+        },
+
         phone: {
             type: String,
             required: true,

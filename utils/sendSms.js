@@ -10,7 +10,7 @@ const sendSms = async ({ phone, message }) => {
                 recipient: cleanPhone,
                 sender_id: process.env.SMSAPI_FROM,
                 type: "plain",
-                message: message,
+                message,
             },
             {
                 headers: {
@@ -22,13 +22,37 @@ const sendSms = async ({ phone, message }) => {
         );
 
         if (response.data?.status !== "success") {
-            throw new Error(response.data?.message || "SMS sending failed");
+            const customError = new Error(
+                response.data?.message || "SMS sending failed"
+            );
+
+            customError.providerResponse = response.data;
+
+            throw customError;
         }
 
         return response.data;
     } catch (error) {
-        console.log("SMSAPI.LK Error:", error.response?.data || error.message);
-        throw error;
+        console.error(
+            "SMSAPI.LK Error:",
+            error.response?.data || error.message
+        );
+
+        const customError = new Error(
+            error.response?.data?.message ||
+            error.response?.data?.error ||
+            error.message ||
+            "SMS sending failed"
+        );
+
+        customError.statusCode = error.response?.status || 500;
+
+        customError.providerResponse =
+            error.response?.data || {
+                message: error.message,
+            };
+
+        throw customError;
     }
 };
 

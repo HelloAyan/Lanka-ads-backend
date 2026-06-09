@@ -19,7 +19,7 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/", (req, res) => {
-    res.send("Backend running 123456");
+    res.send("Backend running 1");
 });
 
 app.use("/api/auth", authRoutes);

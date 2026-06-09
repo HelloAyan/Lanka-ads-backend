@@ -49,7 +49,7 @@ exports.sendOtp = async (req, res) => {
             expiresAt: new Date(Date.now() + 5 * 60 * 1000),
         });
 
-        await sendSms({
+        const smsResponse = await sendSms({
             phone,
             message: `Your OTP code is ${otp}. It will expire in 5 minutes.`,
         });
@@ -57,6 +57,7 @@ exports.sendOtp = async (req, res) => {
         return res.json({
             success: true,
             message: "OTP sent successfully",
+            sms: smsResponse,
         });
     } catch (error) {
         console.error("Send OTP error:", error);
@@ -64,6 +65,9 @@ exports.sendOtp = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Failed to send OTP",
+            reason: error.message,
+            providerStatusCode: error.statusCode || null,
+            providerResponse: error.providerResponse || null,
         });
     }
 };
@@ -118,6 +122,10 @@ exports.verifyOtp = async (req, res) => {
                 lastLoginAt: new Date(),
             });
         } else {
+            if (!user.accountId) {
+                user.accountId = await generateAccountId();
+            }
+
             user.lastLoginAt = new Date();
             await user.save();
         }
@@ -148,6 +156,7 @@ exports.verifyOtp = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "OTP verification failed",
+            error: error.message,
         });
     }
 };

@@ -64,7 +64,6 @@ exports.sendOtp = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Failed to send OTP",
-            error: error.message,
         });
     }
 };
@@ -119,10 +118,6 @@ exports.verifyOtp = async (req, res) => {
                 lastLoginAt: new Date(),
             });
         } else {
-            if (!user.accountId) {
-                user.accountId = await generateAccountId();
-            }
-
             user.lastLoginAt = new Date();
             await user.save();
         }
@@ -153,7 +148,6 @@ exports.verifyOtp = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "OTP verification failed",
-            error: error.message,
         });
     }
 };

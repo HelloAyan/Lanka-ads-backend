@@ -1,117 +1,146 @@
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import api from "@/lib/api";
+const Ad = require("../models/Ad");
+const Counter = require("../models/Counter");
 
-export const createAd = createAsyncThunk(
-    "ads/createAd",
-    async (formData, { rejectWithValue }) => {
-        try {
-            const res = await api.post("/api/ads", formData);
-
-            return res.data;
-        } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.message ||
-                error.response?.data?.error ||
-                "Failed to create ad"
-            );
+const generateAdId = async () => {
+    const counter = await Counter.findOneAndUpdate(
+        { name: "adId" },
+        { $inc: { seq: 1 } },
+        {
+            new: true,
+            upsert: true,
         }
-    }
-);
+    );
 
-export const getMyAds = createAsyncThunk(
-    "ads/getMyAds",
-    async (_, { rejectWithValue }) => {
-        try {
-            const res = await api.get("/api/ads/my-ads");
+    return `AD${counter.seq}`;
+};
 
-            return res.data.ads;
-        } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.message ||
-                error.response?.data?.error ||
-                "Failed to get ads"
-            );
-        }
-    }
-);
+exports.createAd = async (req, res) => {
+    try {
+        const {
+            type,
+            title,
+            category,
+            location,
+            price,
+            description,
+            whatsapp,
+            telegram,
+            imo,
+            viber,
+        } = req.body;
 
-export const deleteAd = createAsyncThunk(
-    "ads/deleteAd",
-    async (id, { rejectWithValue }) => {
-        try {
-            await api.delete(`/api/ads/${id}`);
-
-            return id;
-        } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.message ||
-                error.response?.data?.error ||
-                "Failed to delete ad"
-            );
-        }
-    }
-);
-
-const adSlice = createSlice({
-    name: "ads",
-    initialState: {
-        ads: [],
-        loading: false,
-        error: null,
-    },
-    reducers: {
-        clearAdError: (state) => {
-            state.error = null;
-        },
-    },
-    extraReducers: (builder) => {
-        builder
-            .addCase(createAd.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(createAd.fulfilled, (state, action) => {
-                state.loading = false;
-
-                if (action.payload?.ad) {
-                    state.ads.unshift(action.payload.ad);
-                }
-            })
-            .addCase(createAd.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            })
-
-            .addCase(getMyAds.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(getMyAds.fulfilled, (state, action) => {
-                state.loading = false;
-                state.ads = action.payload || [];
-            })
-            .addCase(getMyAds.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            })
-
-            .addCase(deleteAd.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(deleteAd.fulfilled, (state, action) => {
-                state.loading = false;
-                state.ads = state.ads.filter(
-                    (ad) => ad._id !== action.payload
-                );
-            })
-            .addCase(deleteAd.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
+        if (!title || !category || !location || !price || !description) {
+            return res.status(400).json({
+                success: false,
+                message: "Required fields are missing.",
             });
-    },
-});
+        }
 
-export const { clearAdError } = adSlice.actions;
+        const adId = await generateAdId();
 
-export default adSlice.reducer;
+        const ad = await Ad.create({
+            user: req.user._id,
+            adId,
+
+            image: req.file
+                ? {
+                    url: `/uploads/ads/${req.file.filename}`,
+                    filename: req.file.filename,
+                }
+                : {
+                    url: "",
+                    filename: "",
+                },
+
+            type: type || "Super Ad",
+            title,
+            category,
+            location,
+            price: Number(price),
+            description,
+
+            socialAvailability: {
+                whatsapp: whatsapp === "true" || whatsapp === true,
+                telegram: telegram === "true" || telegram === true,
+                imo: imo === "true" || imo === true,
+                viber: viber === "true" || viber === true,
+            },
+
+            status: "pending",
+        });
+
+        const populatedAd = await Ad.findById(ad._id).populate(
+            "user",
+            "accountId phone name"
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "Ad created successfully",
+            ad: populatedAd,
+        });
+    } catch (error) {
+        console.error("Create Ad Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to create ad",
+            error: error.message,
+        });
+    }
+};
+
+exports.getMyAds = async (req, res) => {
+    try {
+        const ads = await Ad.find({
+            user: req.user._id,
+        })
+            .populate("user", "accountId phone name")
+            .sort({ createdAt: -1 });
+
+        return res.json({
+            success: true,
+            count: ads.length,
+            ads,
+        });
+    } catch (error) {
+        console.error("Get My Ads Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to get ads",
+            error: error.message,
+        });
+    }
+};
+
+exports.deleteAd = async (req, res) => {
+    try {
+        const ad = await Ad.findOne({
+            _id: req.params.id,
+            user: req.user._id,
+        });
+
+        if (!ad) {
+            return res.status(404).json({
+                success: false,
+                message: "Ad not found",
+            });
+        }
+
+        await ad.deleteOne();
+
+        return res.json({
+            success: true,
+            message: "Ad deleted successfully",
+        });
+    } catch (error) {
+        console.error("Delete Ad Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to delete ad",
+            error: error.message,
+        });
+    }
+};

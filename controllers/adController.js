@@ -93,12 +93,47 @@ exports.createAd = async (req, res) => {
 exports.getMyAds = async (req, res) => {
     try {
         const page = Math.max(Number(req.query.page) || 1, 1);
-        const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+        const limit = Math.min(
+            Math.max(Number(req.query.limit) || 20, 1),
+            100
+        );
+
         const skip = (page - 1) * limit;
+
+        const search = req.query.search?.trim() || "";
 
         const filter = {
             user: req.user._id,
         };
+
+        if (search) {
+            filter.$or = [
+                {
+                    title: {
+                        $regex: search,
+                        $options: "i",
+                    },
+                },
+                {
+                    category: {
+                        $regex: search,
+                        $options: "i",
+                    },
+                },
+                {
+                    location: {
+                        $regex: search,
+                        $options: "i",
+                    },
+                },
+                {
+                    adId: {
+                        $regex: search,
+                        $options: "i",
+                    },
+                },
+            ];
+        }
 
         const [ads, totalAds] = await Promise.all([
             Ad.find(filter)
@@ -117,6 +152,7 @@ exports.getMyAds = async (req, res) => {
             count: ads.length,
             page,
             limit,
+            search,
             totalAds,
             totalPages,
             hasNextPage: page < totalPages,

@@ -92,15 +92,35 @@ exports.createAd = async (req, res) => {
 
 exports.getMyAds = async (req, res) => {
     try {
-        const ads = await Ad.find({
+        const page = Math.max(Number(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+        const skip = (page - 1) * limit;
+
+        const filter = {
             user: req.user._id,
-        })
-            .populate("user", "accountId phone name")
-            .sort({ createdAt: -1 });
+        };
+
+        const [ads, totalAds] = await Promise.all([
+            Ad.find(filter)
+                .populate("user", "accountId phone name")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+
+            Ad.countDocuments(filter),
+        ]);
+
+        const totalPages = Math.ceil(totalAds / limit);
 
         return res.json({
             success: true,
             count: ads.length,
+            page,
+            limit,
+            totalAds,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1,
             ads,
         });
     } catch (error) {
